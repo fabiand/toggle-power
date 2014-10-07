@@ -1,0 +1,18 @@
+#!/bin/bash
+# vim: sw=4 et sts=4
+
+# Usage: toggle-power [up|down|selftest] host-01.local
+
+# Files holding the MAC for a fqdn
+MACCACHE=/tmp/.mac_for_
+get_addr() { getent hosts $1 | cut -d" " -f 1 ; ping -q -c1 $1 >&- ; }
+get_macs() { ADDR=$(get_addr $1) ; awk "/^$ADDR / {print \$4;}" /proc/net/arp ; }
+cache() { C=${MACCACHE}$1 ; if [[ -n $2 ]]; then echo $2>$C; else cat $C; fi ; }
+
+down() { cache $1 "$(get_macs $1)" ; ssh $1 "sudo systemctl suspend" & }
+up() { wol $(cache $1) ; rm -f ${MACCACHE}$1 ; }
+toggle() { if [[ -f ${MACCACHE}$1 ]] ; then up $1; else down $1; fi ; }
+
+selftest() { echo "Self-test ..." ; bash -x -n $0 && echo "Ok" ; }
+
+case $1 in up|down|selftest) $@;; *) toggle $@;; esac
